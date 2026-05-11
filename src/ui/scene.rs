@@ -1,3 +1,4 @@
+#[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct Rect {
     pub x: f32,
@@ -6,6 +7,9 @@ pub struct Rect {
     pub height: f32,
     pub color: [f32; 4],
 }
+
+unsafe impl bytemuck::Pod for Rect {}
+unsafe impl bytemuck::Zeroable for Rect {}
 
 impl Rect {
     pub fn new(x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) -> Self {

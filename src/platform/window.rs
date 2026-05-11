@@ -1,3 +1,4 @@
+use std::time::{Duration, Instant};
 use winit::{
     event::{ElementState, Event, KeyboardInput, MouseScrollDelta, StartCause, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -69,7 +70,8 @@ impl AppWindow {
         let window = self.window;
         let mut pending_resize: Option<(u32, u32)> = None;
         self.event_loop.run(move |event, _target, control_flow| {
-            *control_flow = ControlFlow::Wait;
+            // Keep the loop responsive (~60 Hz cap when idle) without burning CPU.
+            *control_flow = ControlFlow::WaitUntil(Instant::now() + Duration::from_millis(16));
 
             match event {
                 Event::NewEvents(StartCause::Init) => {

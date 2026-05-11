@@ -1,4 +1,3 @@
-use super::super::RectInstance;
 use wgpu::{Color, Device, Queue, RenderPipeline, Surface, SurfaceConfiguration};
 
 pub struct Renderer {
@@ -16,5 +15,4 @@ pub struct Renderer {
     pub(super) quad_index_count: u32,
     pub(super) instance_buffer: wgpu::Buffer,
     pub(super) instance_capacity: u64,
-    pub(super) instances: Vec<RectInstance>,
 }

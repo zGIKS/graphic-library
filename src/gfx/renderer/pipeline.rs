@@ -69,7 +69,7 @@ pub fn create_pipeline(
                 ],
             },
             wgpu::VertexBufferLayout {
-                array_stride: std::mem::size_of::<super::RectInstance>() as u64,
+                array_stride: std::mem::size_of::<crate::ui::Rect>() as u64,
                 step_mode: wgpu::VertexStepMode::Instance,
                 attributes: &[
                     wgpu::VertexAttribute {
