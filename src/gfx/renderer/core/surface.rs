@@ -8,9 +8,15 @@ impl Renderer {
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
-        self.config.width = width.max(1);
-        self.config.height = height.max(1);
-        self.surface.configure(&self.device, &self.config);
+        let w = width.max(1);
+        let h = height.max(1);
+        if w == self.config.width && h == self.config.height {
+            return;
+        }
+
+        self.config.width = w;
+        self.config.height = h;
+        self.surface_needs_configure = true;
         self.update_globals();
     }
 
@@ -24,12 +30,15 @@ impl Renderer {
     }
 
     pub(super) fn acquire_frame(&mut self) -> Option<wgpu::SurfaceTexture> {
+        if self.surface_needs_configure {
+            self.surface.configure(&self.device, &self.config);
+            self.surface_needs_configure = false;
+        }
+
         match self.surface.get_current_texture() {
             Ok(frame) => Some(frame),
             Err(wgpu::SurfaceError::Outdated | wgpu::SurfaceError::Lost) => {
-                if self.config.width > 0 && self.config.height > 0 {
-                    self.surface.configure(&self.device, &self.config);
-                }
+                self.surface_needs_configure = true;
                 None
             }
             Err(wgpu::SurfaceError::Timeout) => None,
@@ -39,4 +48,3 @@ impl Renderer {
         }
     }
 }
-

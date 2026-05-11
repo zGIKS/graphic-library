@@ -29,15 +29,28 @@ impl Renderer {
             .await
             .map_err(|e| format!("Failed to request device: {}", e))?;
 
-        let format = wgpu::TextureFormat::Bgra8Unorm;
+        // Keep wgpu defaults: first supported format is preferred; FIFO is the most compatible.
+        let formats = surface.get_supported_formats(&adapter);
+        let alpha_modes = surface.get_supported_alpha_modes(&adapter);
+
+        let format = formats
+            .first()
+            .copied()
+            .unwrap_or(wgpu::TextureFormat::Bgra8Unorm);
+        let present_mode = wgpu::PresentMode::Fifo;
+        let alpha_mode = alpha_modes
+            .first()
+            .copied()
+            .unwrap_or(wgpu::CompositeAlphaMode::Auto);
+
         let size = window.inner_size();
         let config = SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format,
             width: size.width.max(1),
             height: size.height.max(1),
-            present_mode: wgpu::PresentMode::Fifo,
-            alpha_mode: wgpu::CompositeAlphaMode::Auto,
+            present_mode,
+            alpha_mode,
         };
         surface.configure(&device, &config);
 
@@ -84,13 +97,14 @@ impl Renderer {
             queue,
             surface,
             config,
+            surface_needs_configure: false,
             pipeline,
             globals_bg,
             globals_buffer,
             clear_color: Color {
-                r: 0.1,
-                g: 0.1,
-                b: 0.1,
+                r: 0.0,
+                g: 0.0,
+                b: 0.0,
                 a: 1.0,
             },
             quad_vertex_buffer,

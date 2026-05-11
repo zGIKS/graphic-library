@@ -6,6 +6,7 @@ pub struct Renderer {
     pub(super) queue: Queue,
     pub(super) surface: Surface,
     pub(super) config: SurfaceConfiguration,
+    pub(super) surface_needs_configure: bool,
     pub(super) pipeline: RenderPipeline,
     pub(super) globals_bg: wgpu::BindGroup,
     pub(super) globals_buffer: wgpu::Buffer,
@@ -17,4 +18,3 @@ pub struct Renderer {
     pub(super) instance_capacity: u64,
     pub(super) instances: Vec<RectInstance>,
 }
-
