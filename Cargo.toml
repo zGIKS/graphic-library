@@ -1,0 +1,19 @@
+[package]
+name = "rendui"
+version = "0.1.0"
+edition = "2021"
+description = "Minimal GPU-rendered UI framework"
+authors = ["You"]
+
+[dependencies]
+wgpu = "0.14"
+winit = "0.27"
+raw-window-handle = "0.5"
+parking_lot = "0.12"
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+bytemuck = "1"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
