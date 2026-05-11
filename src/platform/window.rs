@@ -10,6 +10,7 @@ pub struct WindowEvents {
     pub close_requested: bool,
     pub resized: Option<(u32, u32)>,
     pub redraw_requested: bool,
+    pub interactive: bool,
 }
 
 impl WindowEvents {
@@ -18,6 +19,7 @@ impl WindowEvents {
             close_requested: false,
             resized: None,
             redraw_requested: false,
+            interactive: false,
         }
     }
 }
@@ -69,9 +71,16 @@ impl AppWindow {
     {
         let window = self.window;
         let mut pending_resize: Option<(u32, u32)> = None;
+        let mut interactive_until: Option<Instant> = None;
         self.event_loop.run(move |event, _target, control_flow| {
-            // Keep the loop responsive (~60 Hz cap when idle) without burning CPU.
-            *control_flow = ControlFlow::WaitUntil(Instant::now() + Duration::from_millis(16));
+            // Default: sleep when idle. During interactive resize, poll/redraw for smoothness.
+            let now = Instant::now();
+            if interactive_until.is_some_and(|t| now < t) {
+                *control_flow = ControlFlow::Poll;
+            } else {
+                interactive_until = None;
+                *control_flow = ControlFlow::Wait;
+            }
 
             match event {
                 Event::NewEvents(StartCause::Init) => {
@@ -83,10 +92,12 @@ impl AppWindow {
                     }
                     WindowEvent::Resized(size) => {
                         pending_resize = Some((size.width, size.height));
+                        interactive_until = Some(now + Duration::from_millis(250));
                         window.request_redraw();
                     }
                     WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
                         pending_resize = Some((new_inner_size.width, new_inner_size.height));
+                        interactive_until = Some(now + Duration::from_millis(250));
                         window.request_redraw();
                     }
                     WindowEvent::KeyboardInput { input: KeyboardInput { state, .. }, .. } => {
@@ -98,11 +109,17 @@ impl AppWindow {
                     WindowEvent::MouseWheel { delta: MouseScrollDelta::PixelDelta(_), .. } => {}
                     _ => {}
                 },
+                Event::MainEventsCleared => {
+                    if interactive_until.is_some() {
+                        window.request_redraw();
+                    }
+                }
                 Event::RedrawRequested(_) => {
                     let events = WindowEvents {
                         close_requested: false,
                         resized: pending_resize.take(),
                         redraw_requested: true,
+                        interactive: interactive_until.is_some(),
                     };
                     on_frame(&window, events);
                 }

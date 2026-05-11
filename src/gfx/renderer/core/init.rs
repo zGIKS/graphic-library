@@ -120,6 +120,7 @@ impl Renderer {
             quad_index_count: quad_indices.len() as u32,
             instance_buffer,
             instance_capacity: initial_instance_capacity,
+            instances: Vec::with_capacity(4096),
         };
 
         this.update_globals();

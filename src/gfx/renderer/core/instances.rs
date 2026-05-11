@@ -24,54 +24,27 @@ impl Renderer {
         let vw = self.config.width as f32;
         let vh = self.config.height as f32;
 
-        // Fast-path: if everything fits, upload without allocation.
-        let required_bytes = std::mem::size_of_val(rects) as u64;
-        self.ensure_instance_capacity(required_bytes);
-
-        // If no rects are culled, zero-copy upload the whole slice.
-        let all_visible = rects.iter().all(|r| {
-            r.x < vw && r.y < vh && r.x + r.width > 0.0 && r.y + r.height > 0.0
-        });
-
-        if all_visible {
-            self.queue.write_buffer(
-                &self.instance_buffer,
-                0,
-                bytemuck::cast_slice(rects),
-            );
-            return (required_bytes, rects.len() as u32);
+        // Single pass: cull + pack into the persistent instance scratch buffer.
+        self.instances.clear();
+        self.instances.reserve(rects.len());
+        for r in rects {
+            if r.x < vw && r.y < vh && r.x + r.width > 0.0 && r.y + r.height > 0.0 {
+                self.instances.push(super::super::RectInstance {
+                    pos: [r.x, r.y],
+                    size: [r.width, r.height],
+                    color: r.color,
+                });
+            }
         }
 
-        // Slow-path: filter out invisible rects into a temporary stack buffer.
-        // 4096 rects * 32 bytes = 128 KiB, well within typical stack limits.
-        const STACK_LIMIT: usize = 4096;
-        let visible_count = rects.iter().filter(|r| {
-            r.x < vw && r.y < vh && r.x + r.width > 0.0 && r.y + r.height > 0.0
-        }).count();
-
-        let bytes = (visible_count * std::mem::size_of::<crate::ui::Rect>()) as u64;
+        let bytes = std::mem::size_of_val(self.instances.as_slice()) as u64;
         self.ensure_instance_capacity(bytes);
+        self.queue.write_buffer(
+            &self.instance_buffer,
+            0,
+            bytemuck::cast_slice(self.instances.as_slice()),
+        );
 
-        if visible_count <= STACK_LIMIT {
-            let mut tmp: [crate::ui::Rect; STACK_LIMIT] = unsafe { std::mem::zeroed() };
-            let mut i = 0;
-            for r in rects {
-                if r.x < vw && r.y < vh && r.x + r.width > 0.0 && r.y + r.height > 0.0 {
-                    tmp[i] = *r;
-                    i += 1;
-                }
-            }
-            self.queue.write_buffer(&self.instance_buffer, 0, bytemuck::cast_slice(&tmp[..i]));
-        } else {
-            let mut tmp = Vec::with_capacity(visible_count);
-            for r in rects {
-                if r.x < vw && r.y < vh && r.x + r.width > 0.0 && r.y + r.height > 0.0 {
-                    tmp.push(*r);
-                }
-            }
-            self.queue.write_buffer(&self.instance_buffer, 0, bytemuck::cast_slice(&tmp));
-        }
-
-        (bytes, visible_count as u32)
+        (bytes, self.instances.len() as u32)
     }
 }

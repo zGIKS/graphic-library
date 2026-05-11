@@ -32,6 +32,10 @@ impl App {
                 force_render = true; // Viewport changed, must re-render
             }
 
+            if events.interactive {
+                force_render = true;
+            }
+
             scene.clear();
             update_fn(&mut renderer, &mut scene);
 

@@ -111,7 +111,7 @@ pub fn create_pipeline(
                 entry_point: "fragment_main",
                 targets: &[Some(wgpu::ColorTargetState {
                     format,
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    blend: None,
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
             }),
