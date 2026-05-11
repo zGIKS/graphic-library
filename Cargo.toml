@@ -7,7 +7,7 @@ authors = ["You"]
 
 [dependencies]
 wgpu = "0.14"
-winit = { version = "0.27", default-features = false, features = ["x11"] }
+winit = { version = "0.27", default-features = false, features = ["x11", "wayland", "wayland-dlopen"] }
 pollster = "0.3"
 bytemuck = "1"
 

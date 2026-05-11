@@ -29,7 +29,7 @@ impl Renderer {
             .await
             .map_err(|e| format!("Failed to request device: {}", e))?;
 
-        // Keep wgpu defaults: first supported format is preferred; FIFO is the most compatible.
+        // Prefer low-latency present modes when available; fall back to FIFO for compatibility.
         let formats = surface.get_supported_formats(&adapter);
         let alpha_modes = surface.get_supported_alpha_modes(&adapter);
 
@@ -41,6 +41,8 @@ impl Renderer {
         let present_modes = surface.get_supported_present_modes(&adapter);
         let present_mode = if present_modes.contains(&wgpu::PresentMode::Mailbox) {
             wgpu::PresentMode::Mailbox // lowest latency, ideal for resizing
+        } else if present_modes.contains(&wgpu::PresentMode::Immediate) {
+            wgpu::PresentMode::Immediate
         } else {
             wgpu::PresentMode::Fifo
         };
