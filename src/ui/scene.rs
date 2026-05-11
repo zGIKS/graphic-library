@@ -1,5 +1,3 @@
-use crate::gfx::Vertex;
-
 #[derive(Clone, Copy, Debug)]
 pub struct Rect {
     pub x: f32,
@@ -20,47 +18,36 @@ impl Rect {
         }
     }
 
-    pub fn to_vertices(&self, scale_x: f32, scale_y: f32) -> [Vertex; 6] {
-        let x1 = (self.x / scale_x) * 2.0 - 1.0;
-        let y1 = 1.0 - (self.y / scale_y) * 2.0;
-        let x2 = ((self.x + self.width) / scale_x) * 2.0 - 1.0;
-        let y2 = 1.0 - ((self.y + self.height) / scale_y) * 2.0;
-
-        let [r, g, b, a] = self.color;
-
-        // Two triangles (triangle list) so multiple rects can be concatenated safely.
-        [
-            Vertex::new(x1, y1, r, g, b, a),
-            Vertex::new(x2, y1, r, g, b, a),
-            Vertex::new(x1, y2, r, g, b, a),
-            Vertex::new(x1, y2, r, g, b, a),
-            Vertex::new(x2, y1, r, g, b, a),
-            Vertex::new(x2, y2, r, g, b, a),
-        ]
-    }
+    // Geometry is generated on the GPU; this struct stays in pixel-space.
 }
 
 pub struct Scene {
     rects: Vec<Rect>,
     pub width: f32,
     pub height: f32,
+    version: u64,
 }
 
 impl Scene {
     pub fn new(width: f32, height: f32) -> Self {
         Self {
-            rects: Vec::new(),
+            rects: Vec::with_capacity(1024),
             width,
             height,
+            version: 0,
         }
     }
 
-    pub fn begin_frame(&mut self) {
-        self.rects.clear();
+    pub fn clear(&mut self) {
+        if !self.rects.is_empty() {
+            self.rects.clear();
+            self.version = self.version.wrapping_add(1);
+        }
     }
 
     pub fn add_rect(&mut self, rect: Rect) {
         self.rects.push(rect);
+        self.version = self.version.wrapping_add(1);
     }
 
     pub fn update_size(&mut self, width: f32, height: f32) {
@@ -71,5 +58,8 @@ impl Scene {
     pub fn rects(&self) -> &[Rect] {
         &self.rects
     }
-}
 
+    pub fn version(&self) -> u64 {
+        self.version
+    }
+}

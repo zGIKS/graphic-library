@@ -1,5 +1,5 @@
 use winit::{
-    event::{ElementState, Event, KeyboardInput, MouseScrollDelta, WindowEvent},
+    event::{ElementState, Event, KeyboardInput, MouseScrollDelta, StartCause, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::{Window, WindowBuilder},
 };
@@ -67,20 +67,25 @@ impl AppWindow {
         F: FnMut(&Window, WindowEvents) + 'static,
     {
         let window = self.window;
+        let mut pending_resize: Option<(u32, u32)> = None;
         self.event_loop.run(move |event, _target, control_flow| {
             *control_flow = ControlFlow::Wait;
-            let mut events = WindowEvents::new();
 
             match event {
+                Event::NewEvents(StartCause::Init) => {
+                    window.request_redraw();
+                }
                 Event::WindowEvent { event, .. } => match event {
                     WindowEvent::CloseRequested => {
-                        events.close_requested = true;
+                        *control_flow = ControlFlow::Exit;
                     }
                     WindowEvent::Resized(size) => {
-                        events.resized = Some((size.width, size.height));
+                        pending_resize = Some((size.width, size.height));
+                        window.request_redraw();
                     }
                     WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                        events.resized = Some((new_inner_size.width, new_inner_size.height));
+                        pending_resize = Some((new_inner_size.width, new_inner_size.height));
+                        window.request_redraw();
                     }
                     WindowEvent::KeyboardInput { input: KeyboardInput { state, .. }, .. } => {
                         if state == ElementState::Pressed {
@@ -92,20 +97,14 @@ impl AppWindow {
                     _ => {}
                 },
                 Event::RedrawRequested(_) => {
-                    events.redraw_requested = true;
-                }
-                Event::MainEventsCleared => {
-                    window.request_redraw();
+                    let events = WindowEvents {
+                        close_requested: false,
+                        resized: pending_resize.take(),
+                        redraw_requested: true,
+                    };
+                    on_frame(&window, events);
                 }
                 _ => {}
-            }
-
-            if events.close_requested {
-                *control_flow = ControlFlow::Exit;
-            }
-
-            if events.redraw_requested || events.resized.is_some() {
-                on_frame(&window, events);
             }
         });
     }

@@ -5,16 +5,11 @@ use crate::ui::Scene;
 pub struct App {
     renderer: Renderer,
     window: AppWindow,
-    vertices: Vec<crate::gfx::Vertex>,
 }
 
 impl App {
     pub fn new(window: AppWindow, renderer: Renderer) -> Self {
-        Self {
-            renderer,
-            window,
-            vertices: Vec::new(),
-        }
+        Self { renderer, window }
     }
 
     pub fn run_loop<F>(self, mut update_fn: F) -> !
@@ -24,7 +19,6 @@ impl App {
         let (w, h) = self.window.inner_size();
 
         let mut renderer = self.renderer;
-        let mut vertices = self.vertices;
         let window = self.window;
         let mut scene = Scene::new(w as f32, h as f32);
 
@@ -34,15 +28,9 @@ impl App {
                 renderer.resize(rw, rh);
             }
 
-            scene.begin_frame();
+            scene.clear();
             update_fn(&mut renderer, &mut scene);
-
-            vertices.clear();
-            for rect in scene.rects() {
-                vertices.extend_from_slice(&rect.to_vertices(scene.width, scene.height));
-            }
-
-            renderer.render_vertices(&vertices);
+            renderer.render_rects(scene.rects());
         })
     }
 }
