@@ -7,7 +7,7 @@ authors = ["You"]
 
 [dependencies]
 wgpu = "0.14"
-winit = "0.27"
+winit = { version = "0.27", default-features = false, features = ["x11"] }
 raw-window-handle = "0.5"
 parking_lot = "0.12"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }

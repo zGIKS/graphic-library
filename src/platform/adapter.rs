@@ -21,6 +21,12 @@ impl Platform {
     }
 }
 
+impl Default for Platform {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct AdapterInfo {
     pub name: String,

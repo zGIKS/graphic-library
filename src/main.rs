@@ -1,9 +1,7 @@
 use rendui::Rect;
 
 fn main() {
-    let (window, renderer) = rendui::run("Rendui MVP", 800, 600).expect("Failed to init");
-
-    let app = rendui::App { renderer, window };
+    let app = rendui::run("Rendui MVP", 800, 600).expect("Failed to init");
 
     app.run_loop(|_renderer, scene| {
         scene.add_rect(Rect::new(100.0, 100.0, 200.0, 150.0, [1.0, 0.3, 0.3, 1.0]));

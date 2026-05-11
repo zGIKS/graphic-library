@@ -2,17 +2,23 @@
 
 pkgs.mkShell {
   buildInputs = with pkgs; [
-    cmake
     pkg-config
-    fontconfig
-    freetype
-    libglvnd
     libxkbcommon
-    wayland
+    vulkan-loader
     xorg.libX11
     xorg.libXcursor
     xorg.libXi
     xorg.libXrandr
-    udev
   ];
+
+  shellHook = ''
+    export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath (with pkgs; [
+      libxkbcommon
+      vulkan-loader
+      xorg.libX11
+      xorg.libXcursor
+      xorg.libXi
+      xorg.libXrandr
+    ])}:$LD_LIBRARY_PATH"
+  '';
 }

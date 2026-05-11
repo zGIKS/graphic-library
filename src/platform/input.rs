@@ -71,3 +71,4 @@ impl Default for InputState {
         Self::new()
     }
 }
+
