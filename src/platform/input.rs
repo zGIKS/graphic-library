@@ -1,4 +1,8 @@
-use winit::event::MouseButton;
+use std::collections::HashSet;
+use winit::{
+    event::MouseButton,
+    keyboard::{KeyCode, ModifiersState},
+};
 
 #[derive(Clone, Copy, Debug)]
 pub struct MousePos {
@@ -12,59 +16,57 @@ impl MousePos {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum MouseButtonState {
-    Pressed,
-    Released,
-}
-
 #[derive(Clone, Debug)]
 pub enum InputEvent {
     MouseMove(MousePos),
     MouseDown(MouseButton, MousePos),
     MouseUp(MouseButton, MousePos),
     MouseWheel(f64, f64),
-    KeyDown(u32),
-    KeyUp(u32),
+    KeyDown(KeyCode),
+    KeyUp(KeyCode),
+    Text(String),
 }
 
+#[derive(Clone, Debug)]
 pub struct InputState {
     pub mouse_pos: Option<MousePos>,
-    pub mouse_buttons: [bool; 8],
-    pub keys: [bool; 512],
+    pub modifiers: ModifiersState,
+    mouse_buttons: HashSet<MouseButton>,
+    keys: HashSet<KeyCode>,
 }
 
 impl InputState {
     pub fn new() -> Self {
         Self {
             mouse_pos: None,
-            mouse_buttons: [false; 8],
-            keys: [false; 512],
+            modifiers: ModifiersState::empty(),
+            mouse_buttons: HashSet::new(),
+            keys: HashSet::new(),
         }
     }
 
-    pub fn is_key_pressed(&self, key: u32) -> bool {
-        if (key as usize) < self.keys.len() {
-            self.keys[key as usize]
+    pub fn set_key(&mut self, key: KeyCode, pressed: bool) {
+        if pressed {
+            self.keys.insert(key);
         } else {
-            false
+            self.keys.remove(&key);
         }
+    }
+
+    pub fn set_mouse_button(&mut self, button: MouseButton, pressed: bool) {
+        if pressed {
+            self.mouse_buttons.insert(button);
+        } else {
+            self.mouse_buttons.remove(&button);
+        }
+    }
+
+    pub fn is_key_pressed(&self, key: KeyCode) -> bool {
+        self.keys.contains(&key)
     }
 
     pub fn is_mouse_button_pressed(&self, button: MouseButton) -> bool {
-        let idx = match button {
-            MouseButton::Left => 0,
-            MouseButton::Right => 1,
-            MouseButton::Middle => 2,
-            MouseButton::Back => 3,
-            MouseButton::Forward => 4,
-            MouseButton::Other(_) => return false,
-        };
-        if (idx as usize) < self.mouse_buttons.len() {
-            self.mouse_buttons[idx as usize]
-        } else {
-            false
-        }
+        self.mouse_buttons.contains(&button)
     }
 }
 
@@ -73,4 +75,3 @@ impl Default for InputState {
         Self::new()
     }
 }
-

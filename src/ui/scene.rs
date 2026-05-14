@@ -8,6 +8,41 @@ pub struct Rect {
     pub color: [f32; 4],
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct Text {
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+    pub size: f32,
+    pub line_height: f32,
+    pub color: [u8; 4],
+    pub content: String,
+}
+
+impl Text {
+    pub fn new(
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        size: f32,
+        content: impl Into<String>,
+        color: [u8; 4],
+    ) -> Self {
+        Self {
+            x,
+            y,
+            width,
+            height,
+            size,
+            line_height: size * 1.25,
+            color,
+            content: content.into(),
+        }
+    }
+}
+
 unsafe impl bytemuck::Pod for Rect {}
 unsafe impl bytemuck::Zeroable for Rect {}
 
@@ -27,6 +62,7 @@ impl Rect {
 
 pub struct Scene {
     rects: Vec<Rect>,
+    texts: Vec<Text>,
     pub width: f32,
     pub height: f32,
     version: u64,
@@ -36,6 +72,7 @@ impl Scene {
     pub fn new(width: f32, height: f32) -> Self {
         Self {
             rects: Vec::with_capacity(1024),
+            texts: Vec::with_capacity(64),
             width,
             height,
             version: 0,
@@ -43,14 +80,20 @@ impl Scene {
     }
 
     pub fn clear(&mut self) {
-        if !self.rects.is_empty() {
+        if !self.rects.is_empty() || !self.texts.is_empty() {
             self.rects.clear();
+            self.texts.clear();
             self.version = self.version.wrapping_add(1);
         }
     }
 
     pub fn add_rect(&mut self, rect: Rect) {
         self.rects.push(rect);
+        self.version = self.version.wrapping_add(1);
+    }
+
+    pub fn add_text(&mut self, text: Text) {
+        self.texts.push(text);
         self.version = self.version.wrapping_add(1);
     }
 
@@ -61,6 +104,10 @@ impl Scene {
 
     pub fn rects(&self) -> &[Rect] {
         &self.rects
+    }
+
+    pub fn texts(&self) -> &[Text] {
+        &self.texts
     }
 
     pub fn version(&self) -> u64 {

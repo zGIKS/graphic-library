@@ -6,7 +6,7 @@ impl Renderer {
             return;
         }
 
-        let new_capacity = required_bytes.next_power_of_two().max(16 * 1024 * 1024);
+        let new_capacity = required_bytes.next_power_of_two().max(256 * 1024);
         self.instance_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("instance buffer (resized)"),
             size: new_capacity,

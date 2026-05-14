@@ -1,16 +1,20 @@
+use super::{InputEvent, InputState, MousePos};
 use std::time::{Duration, Instant};
 use winit::{
     event::{ElementState, Event, MouseScrollDelta, StartCause, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
+    keyboard::PhysicalKey,
     window::{Window, WindowBuilder},
 };
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct WindowEvents {
     pub close_requested: bool,
     pub resized: Option<(u32, u32)>,
     pub redraw_requested: bool,
     pub interactive: bool,
+    pub input: InputState,
+    pub input_events: Vec<InputEvent>,
 }
 
 impl WindowEvents {
@@ -20,6 +24,8 @@ impl WindowEvents {
             resized: None,
             redraw_requested: false,
             interactive: false,
+            input: InputState::new(),
+            input_events: Vec::new(),
         }
     }
 }
@@ -72,6 +78,8 @@ impl AppWindow {
     {
         let window = self.window;
         let mut pending_resize: Option<(u32, u32)> = None;
+        let mut input = InputState::new();
+        let mut pending_input = Vec::new();
         let mut interactive_until: Option<Instant> = None;
         const INTERACTIVE_WINDOW: Duration = Duration::from_millis(200);
         self.event_loop
@@ -106,18 +114,66 @@ impl AppWindow {
                             window.request_redraw();
                         }
                         WindowEvent::KeyboardInput { event, .. } => {
-                            if event.state == ElementState::Pressed {
-                                window.request_redraw();
+                            if let PhysicalKey::Code(code) = event.physical_key {
+                                let pressed = event.state == ElementState::Pressed;
+                                input.set_key(code, pressed);
+                                if pressed {
+                                    pending_input.push(InputEvent::KeyDown(code));
+                                } else {
+                                    pending_input.push(InputEvent::KeyUp(code));
+                                }
                             }
+
+                            if event.state == ElementState::Pressed {
+                                if let Some(text) = event.text {
+                                    if !text.is_empty() {
+                                        pending_input.push(InputEvent::Text(text.to_string()));
+                                    }
+                                }
+                            }
+
+                            interactive_until = Some(now + INTERACTIVE_WINDOW);
+                            window.request_redraw();
                         }
-                        WindowEvent::MouseWheel { delta: MouseScrollDelta::LineDelta(_, _), .. } => {}
-                        WindowEvent::MouseWheel { delta: MouseScrollDelta::PixelDelta(_), .. } => {}
+                        WindowEvent::ModifiersChanged(modifiers) => {
+                            input.modifiers = modifiers.state();
+                        }
+                        WindowEvent::CursorMoved { position, .. } => {
+                            let pos = MousePos::new(position.x, position.y);
+                            input.mouse_pos = Some(pos);
+                            pending_input.push(InputEvent::MouseMove(pos));
+                            interactive_until = Some(now + INTERACTIVE_WINDOW);
+                            window.request_redraw();
+                        }
+                        WindowEvent::MouseInput { state, button, .. } => {
+                            let pos = input.mouse_pos.unwrap_or(MousePos::new(0.0, 0.0));
+                            let pressed = state == ElementState::Pressed;
+                            input.set_mouse_button(button, pressed);
+                            if pressed {
+                                pending_input.push(InputEvent::MouseDown(button, pos));
+                            } else {
+                                pending_input.push(InputEvent::MouseUp(button, pos));
+                            }
+                            interactive_until = Some(now + INTERACTIVE_WINDOW);
+                            window.request_redraw();
+                        }
+                        WindowEvent::MouseWheel { delta, .. } => {
+                            let (x, y) = match delta {
+                                MouseScrollDelta::LineDelta(x, y) => (x as f64, y as f64),
+                                MouseScrollDelta::PixelDelta(pos) => (pos.x, pos.y),
+                            };
+                            pending_input.push(InputEvent::MouseWheel(x, y));
+                            interactive_until = Some(now + INTERACTIVE_WINDOW);
+                            window.request_redraw();
+                        }
                         WindowEvent::RedrawRequested => {
                             let events = WindowEvents {
                                 close_requested: false,
                                 resized: pending_resize.take(),
                                 redraw_requested: true,
                                 interactive: interactive_until.is_some(),
+                                input: input.clone(),
+                                input_events: std::mem::take(&mut pending_input),
                             };
                             on_frame(&window, events);
                         }
@@ -133,6 +189,8 @@ impl AppWindow {
                                 resized: Some(size),
                                 redraw_requested: false,
                                 interactive: interactive_until.is_some(),
+                                input: input.clone(),
+                                input_events: std::mem::take(&mut pending_input),
                             };
                             on_frame(&window, events);
                         } else if interactive_until.is_some() {

@@ -10,6 +10,7 @@ wgpu = { version = "0.19", default-features = false, features = ["wgsl"] }
 winit = { version = "0.29", default-features = false, features = ["x11", "wayland", "wayland-dlopen", "rwh_06"] }
 pollster = "0.3"
 bytemuck = "1"
+glyphon = "0.5"
 
 [profile.release]
 opt-level = 3

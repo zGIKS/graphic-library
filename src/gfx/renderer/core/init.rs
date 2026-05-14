@@ -1,5 +1,6 @@
 use super::super::{pipeline, Vertex};
 use super::Renderer;
+use glyphon::{FontSystem, SwashCache, TextAtlas, TextRenderer};
 use wgpu::util::DeviceExt;
 use wgpu::{Color, SurfaceConfiguration};
 use winit::window::Window;
@@ -90,6 +91,15 @@ impl Renderer {
         let globals_bg = pipeline::create_bind_group(&device, &globals_layout, &globals_buffer);
 
         let pipeline = pipeline::create_pipeline(&device, format, &globals_layout);
+        let font_system = FontSystem::new();
+        let text_cache = SwashCache::new();
+        let mut text_atlas = TextAtlas::new(&device, &queue, format);
+        let text_renderer = TextRenderer::new(
+            &mut text_atlas,
+            &device,
+            wgpu::MultisampleState::default(),
+            None,
+        );
 
         let quad_vertices: [Vertex; 4] = [
             Vertex::new(0.0, 0.0),
@@ -110,7 +120,7 @@ impl Renderer {
             usage: wgpu::BufferUsages::INDEX,
         });
 
-        let initial_instance_capacity: u64 = 16 * 1024 * 1024; // 16MB
+        let initial_instance_capacity: u64 = 256 * 1024;
         let instance_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("instance buffer"),
             size: initial_instance_capacity,
@@ -139,6 +149,12 @@ impl Renderer {
             instance_buffer,
             instance_capacity: initial_instance_capacity,
             instances: Vec::with_capacity(4096),
+            font_system,
+            text_cache,
+            text_atlas,
+            text_renderer,
+            text_buffers: Vec::with_capacity(64),
+            cached_texts: Vec::with_capacity(64),
         };
 
         this.update_globals();

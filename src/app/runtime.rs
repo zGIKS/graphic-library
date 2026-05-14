@@ -1,5 +1,5 @@
 use crate::gfx::Renderer;
-use crate::platform::AppWindow;
+use crate::platform::{AppWindow, WindowEvents};
 use crate::ui::Scene;
 use std::time::{Duration, Instant};
 
@@ -16,6 +16,13 @@ impl App {
     pub fn run_loop<F>(self, mut update_fn: F) -> Result<(), String>
     where
         F: FnMut(&mut Renderer, &mut Scene) + 'static,
+    {
+        self.run_loop_events(move |renderer, scene, _events| update_fn(renderer, scene))
+    }
+
+    pub fn run_loop_events<F>(self, mut update_fn: F) -> Result<(), String>
+    where
+        F: FnMut(&mut Renderer, &mut Scene, &WindowEvents) + 'static,
     {
         let (w, h) = self.window.inner_size();
 
@@ -35,7 +42,7 @@ impl App {
                 force_render = true; // Viewport changed, must re-render
             }
 
-            if events.interactive {
+            if events.interactive || !events.input_events.is_empty() {
                 force_render = true;
             }
 
@@ -48,10 +55,10 @@ impl App {
             }
 
             scene.clear();
-            update_fn(&mut renderer, &mut scene);
+            update_fn(&mut renderer, &mut scene, &events);
 
             if force_render || scene.version() != last_rendered_version {
-                renderer.render_rects(scene.rects());
+                renderer.render_scene(&scene);
                 last_rendered_version = scene.version();
                 last_frame_time = now;
             }
