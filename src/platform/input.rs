@@ -56,6 +56,8 @@ impl InputState {
             MouseButton::Left => 0,
             MouseButton::Right => 1,
             MouseButton::Middle => 2,
+            MouseButton::Back => 3,
+            MouseButton::Forward => 4,
             MouseButton::Other(_) => return false,
         };
         if (idx as usize) < self.mouse_buttons.len() {

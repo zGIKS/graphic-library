@@ -6,13 +6,25 @@ use winit::window::Window;
 
 impl Renderer {
     pub async fn new(window: &Window) -> Result<Self, String> {
-        let backends = wgpu::Backends::all();
-        let instance = wgpu::Instance::new(backends);
-        let surface = unsafe { instance.create_surface(window) };
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::all(),
+            ..Default::default()
+        });
+        let surface = instance
+            .create_surface(window)
+            .map_err(|e| format!("Failed to create surface: {:?}", e))?;
+
+        // Safety: window outlives Renderer because Renderer is destroyed before
+        // the window (App stores renderer before window, drop order is inverse).
+        let surface: wgpu::Surface<'static> = unsafe { std::mem::transmute(surface) };
 
         let adapter = instance
-            .enumerate_adapters(backends)
-            .find(|a| a.is_surface_supported(&surface))
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::default(),
+                compatible_surface: Some(&surface),
+                force_fallback_adapter: false,
+            })
+            .await
             .ok_or("No suitable adapter found")?;
 
         println!("Using adapter: {:?}", adapter.get_info().name);
@@ -21,32 +33,36 @@ impl Renderer {
             .request_device(
                 &wgpu::DeviceDescriptor {
                     label: None,
-                    features: wgpu::Features::empty(),
-                    limits: wgpu::Limits::default(),
+                    required_features: wgpu::Features::empty(),
+                    required_limits: wgpu::Limits::default(),
                 },
                 None,
             )
             .await
             .map_err(|e| format!("Failed to request device: {}", e))?;
 
-        // Prefer low-latency present modes when available; fall back to FIFO for compatibility.
-        let formats = surface.get_supported_formats(&adapter);
-        let alpha_modes = surface.get_supported_alpha_modes(&adapter);
-
-        let format = formats
+        let caps = surface.get_capabilities(&adapter);
+        let format = caps
+            .formats
             .first()
             .copied()
             .unwrap_or(wgpu::TextureFormat::Bgra8Unorm);
 
-        let present_modes = surface.get_supported_present_modes(&adapter);
-        let present_mode = if present_modes.contains(&wgpu::PresentMode::Mailbox) {
-            wgpu::PresentMode::Mailbox // lowest latency, ideal for resizing
-        } else if present_modes.contains(&wgpu::PresentMode::Immediate) {
+        // Prefer low-latency modes for responsive resize. Mailbox replaces the
+        // previous frame immediately (no stretched-buffer artifacts). Immediate
+        // renders as fast as possible. Fifo is last because it queues frames
+        // and causes visible lag / bouncing during resize.
+        let present_mode = if caps.present_modes.contains(&wgpu::PresentMode::Mailbox) {
+            wgpu::PresentMode::Mailbox
+        } else if caps.present_modes.contains(&wgpu::PresentMode::Immediate) {
             wgpu::PresentMode::Immediate
+        } else if caps.present_modes.contains(&wgpu::PresentMode::FifoRelaxed) {
+            wgpu::PresentMode::FifoRelaxed
         } else {
             wgpu::PresentMode::Fifo
         };
-        let alpha_mode = alpha_modes
+        let alpha_mode = caps
+            .alpha_modes
             .first()
             .copied()
             .unwrap_or(wgpu::CompositeAlphaMode::Auto);
@@ -59,6 +75,8 @@ impl Renderer {
             height: size.height.max(1),
             present_mode,
             alpha_mode,
+            view_formats: vec![],
+            desired_maximum_frame_latency: 1,
         };
         surface.configure(&device, &config);
 

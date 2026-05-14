@@ -16,7 +16,9 @@ impl Renderer {
 
         self.config.width = w;
         self.config.height = h;
-        self.surface_needs_configure = true;
+        // Configure immediately so the surface is ready before the next render
+        // call. This avoids the compositor seeing an outdated buffer size.
+        self.surface.configure(&self.device, &self.config);
         self.update_globals();
     }
 
@@ -35,15 +37,19 @@ impl Renderer {
             self.surface_needs_configure = false;
         }
 
-        match self.surface.get_current_texture() {
-            Ok(frame) => Some(frame),
-            Err(wgpu::SurfaceError::Outdated | wgpu::SurfaceError::Lost) => {
-                self.surface_needs_configure = true;
-                None
-            }
-            Err(wgpu::SurfaceError::Timeout) => None,
-            Err(wgpu::SurfaceError::OutOfMemory) => {
-                panic!("wgpu surface out of memory");
+        loop {
+            match self.surface.get_current_texture() {
+                Ok(frame) => return Some(frame),
+                Err(wgpu::SurfaceError::Outdated | wgpu::SurfaceError::Lost) => {
+                    // Surface changed under us (resize, moved to another monitor, etc).
+                    // Reconfigure and retry immediately; never drop a resize frame.
+                    self.surface.configure(&self.device, &self.config);
+                    continue;
+                }
+                Err(wgpu::SurfaceError::Timeout) => return None,
+                Err(wgpu::SurfaceError::OutOfMemory) => {
+                    panic!("wgpu surface out of memory");
+                }
             }
         }
     }

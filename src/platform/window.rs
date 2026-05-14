@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 use winit::{
-    event::{ElementState, Event, KeyboardInput, MouseScrollDelta, StartCause, WindowEvent},
+    event::{ElementState, Event, MouseScrollDelta, StartCause, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::{Window, WindowBuilder},
 };
@@ -37,7 +37,8 @@ pub struct AppWindow {
 
 impl AppWindow {
     pub fn new(title: &str, width: u32, height: u32) -> Result<Self, String> {
-        let event_loop = EventLoop::new();
+        let event_loop = EventLoop::new()
+            .map_err(|e| format!("Failed to create event loop: {}", e))?;
 
         let window = WindowBuilder::new()
             .with_title(title)
@@ -65,66 +66,82 @@ impl AppWindow {
         self.window.request_redraw();
     }
 
-    pub fn run<F>(self, mut on_frame: F) -> !
+    pub fn run<F>(self, mut on_frame: F) -> Result<(), String>
     where
         F: FnMut(&Window, WindowEvents) + 'static,
     {
         let window = self.window;
         let mut pending_resize: Option<(u32, u32)> = None;
         let mut interactive_until: Option<Instant> = None;
-        self.event_loop.run(move |event, _target, control_flow| {
-            // Default: sleep when idle. During interactive resize, poll/redraw for smoothness.
-            let now = Instant::now();
-            if interactive_until.is_some_and(|t| now < t) {
-                *control_flow = ControlFlow::Poll;
-            } else {
-                interactive_until = None;
-                *control_flow = ControlFlow::Wait;
-            }
-
-            match event {
-                Event::NewEvents(StartCause::Init) => {
-                    window.request_redraw();
+        const INTERACTIVE_WINDOW: Duration = Duration::from_millis(200);
+        self.event_loop
+            .run(move |event, elwt| {
+                let now = Instant::now();
+                if interactive_until.is_some_and(|t| now < t) {
+                    // Poll gives absolute lowest latency during resize.
+                    // CPU usage is high only while dragging; we sleep after.
+                    elwt.set_control_flow(ControlFlow::Poll);
+                } else {
+                    interactive_until = None;
+                    elwt.set_control_flow(ControlFlow::Wait);
                 }
-                Event::WindowEvent { event, .. } => match event {
-                    WindowEvent::CloseRequested => {
-                        *control_flow = ControlFlow::Exit;
-                    }
-                    WindowEvent::Resized(size) => {
-                        pending_resize = Some((size.width, size.height));
-                        interactive_until = Some(now + Duration::from_millis(250));
+
+                match event {
+                    Event::NewEvents(StartCause::Init) => {
                         window.request_redraw();
                     }
-                    WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                        pending_resize = Some((new_inner_size.width, new_inner_size.height));
-                        interactive_until = Some(now + Duration::from_millis(250));
-                        window.request_redraw();
-                    }
-                    WindowEvent::KeyboardInput { input: KeyboardInput { state, .. }, .. } => {
-                        if state == ElementState::Pressed {
+                    Event::WindowEvent { event, .. } => match event {
+                        WindowEvent::CloseRequested => {
+                            elwt.exit();
+                        }
+                        WindowEvent::Resized(size) => {
+                            pending_resize = Some((size.width, size.height));
+                            interactive_until = Some(now + INTERACTIVE_WINDOW);
+                            window.request_redraw();
+                        }
+                        WindowEvent::ScaleFactorChanged { .. } => {
+                            let new_size = window.inner_size();
+                            pending_resize = Some((new_size.width, new_size.height));
+                            interactive_until = Some(now + INTERACTIVE_WINDOW);
+                            window.request_redraw();
+                        }
+                        WindowEvent::KeyboardInput { event, .. } => {
+                            if event.state == ElementState::Pressed {
+                                window.request_redraw();
+                            }
+                        }
+                        WindowEvent::MouseWheel { delta: MouseScrollDelta::LineDelta(_, _), .. } => {}
+                        WindowEvent::MouseWheel { delta: MouseScrollDelta::PixelDelta(_), .. } => {}
+                        WindowEvent::RedrawRequested => {
+                            let events = WindowEvents {
+                                close_requested: false,
+                                resized: pending_resize.take(),
+                                redraw_requested: true,
+                                interactive: interactive_until.is_some(),
+                            };
+                            on_frame(&window, events);
+                        }
+                        _ => {}
+                    },
+                    Event::AboutToWait => {
+                        // If a resize just happened, render IMMEDIATELY in this cycle
+                        // instead of waiting for RedrawRequested. This eliminates one
+                        // full event-loop iteration, matching Alacritty's approach.
+                        if let Some(size) = pending_resize.take() {
+                            let events = WindowEvents {
+                                close_requested: false,
+                                resized: Some(size),
+                                redraw_requested: false,
+                                interactive: interactive_until.is_some(),
+                            };
+                            on_frame(&window, events);
+                        } else if interactive_until.is_some() {
                             window.request_redraw();
                         }
                     }
-                    WindowEvent::MouseWheel { delta: MouseScrollDelta::LineDelta(_, _), .. } => {}
-                    WindowEvent::MouseWheel { delta: MouseScrollDelta::PixelDelta(_), .. } => {}
                     _ => {}
-                },
-                Event::MainEventsCleared => {
-                    if interactive_until.is_some() {
-                        window.request_redraw();
-                    }
                 }
-                Event::RedrawRequested(_) => {
-                    let events = WindowEvents {
-                        close_requested: false,
-                        resized: pending_resize.take(),
-                        redraw_requested: true,
-                        interactive: interactive_until.is_some(),
-                    };
-                    on_frame(&window, events);
-                }
-                _ => {}
-            }
-        });
+            })
+            .map_err(|e| format!("Event loop error: {}", e))
     }
 }

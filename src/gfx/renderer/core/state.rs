@@ -4,7 +4,7 @@ use wgpu::{Color, Device, Queue, RenderPipeline, Surface, SurfaceConfiguration};
 pub struct Renderer {
     pub(super) device: Device,
     pub(super) queue: Queue,
-    pub(super) surface: Surface,
+    pub(super) surface: Surface<'static>,
     pub(super) config: SurfaceConfiguration,
     pub(super) surface_needs_configure: bool,
     pub(super) pipeline: RenderPipeline,

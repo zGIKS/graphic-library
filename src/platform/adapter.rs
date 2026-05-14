@@ -6,9 +6,13 @@ impl Platform {
     }
 
     pub fn enumerate_adapters() -> Vec<AdapterInfo> {
-        let instance = wgpu::Instance::new(wgpu::Backends::all());
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::all(),
+            ..Default::default()
+        });
         instance
             .enumerate_adapters(wgpu::Backends::all())
+            .into_iter()
             .map(|adapter| {
                 let info = adapter.get_info();
                 AdapterInfo {

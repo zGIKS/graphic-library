@@ -6,8 +6,8 @@ description = "Minimal GPU-rendered UI framework"
 authors = ["You"]
 
 [dependencies]
-wgpu = "0.14"
-winit = { version = "0.27", default-features = false, features = ["x11", "wayland", "wayland-dlopen"] }
+wgpu = "0.19"
+winit = { version = "0.29", default-features = false, features = ["x11", "wayland", "wayland-dlopen", "rwh_06"] }
 pollster = "0.3"
 bytemuck = "1"
 
