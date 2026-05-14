@@ -1,3 +1,3 @@
 pub mod scene;
 
-pub use scene::{Rect, Scene, Text};
+pub use scene::{ClipRect, Rect, Scene, Text};

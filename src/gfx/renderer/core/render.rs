@@ -27,12 +27,7 @@ impl Renderer {
                     left: text.x,
                     top: text.y,
                     scale: 1.0,
-                    bounds: TextBounds {
-                        left: text.x as i32,
-                        top: text.y as i32,
-                        right: (text.x + text.width) as i32,
-                        bottom: (text.y + text.height) as i32,
-                    },
+                    bounds: text_bounds(text),
                     default_color: Color::rgba(
                         text.color[0],
                         text.color[1],
@@ -114,7 +109,14 @@ impl Renderer {
         self.cached_texts.truncate(texts.len());
 
         for (index, text) in texts.iter().enumerate() {
-            if self.cached_texts.get(index) == Some(text) {
+            if self
+                .cached_texts
+                .get(index)
+                .is_some_and(|cached| same_text_layout(cached, text))
+            {
+                if index < self.cached_texts.len() {
+                    self.cached_texts[index] = text.clone();
+                }
                 continue;
             }
 
@@ -127,6 +129,30 @@ impl Renderer {
                 self.cached_texts.push(text.clone());
             }
         }
+    }
+}
+
+fn same_text_layout(a: &crate::ui::Text, b: &crate::ui::Text) -> bool {
+    a.width == b.width
+        && a.height == b.height
+        && a.size == b.size
+        && a.line_height == b.line_height
+        && a.content == b.content
+}
+
+fn text_bounds(text: &crate::ui::Text) -> TextBounds {
+    let bounds = text.clip.unwrap_or(crate::ui::ClipRect {
+        x: text.x,
+        y: text.y,
+        width: text.width,
+        height: text.height,
+    });
+
+    TextBounds {
+        left: bounds.x as i32,
+        top: bounds.y as i32,
+        right: (bounds.x + bounds.width) as i32,
+        bottom: (bounds.y + bounds.height) as i32,
     }
 }
 
